@@ -13,8 +13,7 @@ import (
 )
 
 type Queue struct {
-	Name string `json:"name"`
-	Dir  string `json:dir`
+	Path string `json:"path"`
 
 	queue        *ds.Queue
 	retryQueue   *ds.Queue
@@ -22,18 +21,18 @@ type Queue struct {
 	exit         chan bool
 }
 
-func NewQueue(name, dir string) (*Queue, error) {
-	q := &Queue{Name: name, Dir: dir, exit: make(chan bool)}
+func NewQueue(path string) (*Queue, error) {
+	q := &Queue{Path: path, exit: make(chan bool)}
 	var err error
-	queueDir := filepath.Join(dir, name, "queue")
+	queueDir := filepath.Join(path, "queue")
 	if q.queue, err = ds.OpenQueue(queueDir); err != nil {
 		return nil, err
 	}
-	retryDir := filepath.Join(dir, name, "retry_queue")
+	retryDir := filepath.Join(path, "retry_queue")
 	if q.retryQueue, err = ds.OpenQueue(retryDir); err != nil {
 		return nil, err
 	}
-	storeDir := filepath.Join(dir, name, "running")
+	storeDir := filepath.Join(path, "running")
 	if q.runningStore, err = store.NewLevelStore(storeDir); err != nil {
 		return nil, err
 	}
@@ -111,8 +110,7 @@ func (q *Queue) Close() {
 
 func (q *Queue) Drop() {
 	q.Close()
-	path := filepath.Join(q.Dir, q.Name)
-	os.RemoveAll(path)
+	os.RemoveAll(q.Path)
 }
 
 func (q *Queue) addToRunning(key string, value []byte) error {
