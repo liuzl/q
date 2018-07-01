@@ -45,6 +45,16 @@ func NewQueue(name, dir string) (*Queue, error) {
 	return t, nil
 }
 
+func (q *Queue) Status() map[string]interface{} {
+	if q.queue == nil {
+		return map[string]interface{}{"error": "queue is nil"}
+	}
+	return map[string]interface{}{
+		"queue_length":       q.queue.Length(),
+		"retry_queue_length": q.retryQueue.Length(),
+	}
+}
+
 func (t *Queue) Enqueue(data string) error {
 	if debug {
 		fmt.Println("Enqueue:", data, t.queue.Length(), t.retryQueue.Length())
