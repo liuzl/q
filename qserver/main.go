@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"net/http"
 	"strconv"
@@ -48,7 +49,7 @@ func DequeueHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{"ok", map[string]string{
-		"key": key, "value": value,
+		"key": key, "value": base64.StdEncoding.EncodeToString([]byte(value)),
 	}})
 }
 
