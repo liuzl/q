@@ -19,6 +19,21 @@ type Queue struct {
 	retryQueue   *ds.Queue
 	runningStore *store.LevelStore
 	exit         chan bool
+	retryLimit   int
+}
+
+type valueCnt struct {
+	Value []byte
+	Cnt   int
+}
+
+func NewQueueWithRetryLimit(path string, limit int) (*Queue, error) {
+	q, err := NewQueue(path)
+	if err != nil {
+		return nil, err
+	}
+	q.retryLimit = limit
+	return q, nil
 }
 
 func NewQueue(path string) (*Queue, error) {
@@ -54,7 +69,8 @@ func (q *Queue) Status() map[string]interface{} {
 
 func (q *Queue) Enqueue(data string) error {
 	if q.queue != nil {
-		_, err := q.queue.EnqueueString(data)
+		v := &valueCnt{Value: []byte(data)}
+		_, err := q.queue.EnqueueObject(v)
 		return err
 	}
 	return fmt.Errorf("queue is nil")
@@ -66,14 +82,18 @@ func (q *Queue) dequeue(queue *ds.Queue, timeout int64) (string, string, error) 
 		return "", "", err
 	}
 	key := ""
-	if timeout > 0 {
+	var v valueCnt
+	if err = store.BytesToObject(item.Value, &v); err != nil {
+		return "", "", err
+	}
+	if timeout > 0 && (q.retryLimit <= 0 || v.Cnt < q.retryLimit) {
 		now := time.Now().Unix()
 		key = goutil.TimeStr(now+timeout) + ":" + goutil.ContentMD5(item.Value)
-		if err = q.addToRunning(key, item.Value); err != nil {
+		if err = q.addToRunning(key, v.Value, v.Cnt+1); err != nil {
 			return "", "", err
 		}
 	}
-	return key, string(item.Value), nil
+	return key, string(v.Value), nil
 }
 
 func (q *Queue) Dequeue(timeout int64) (string, string, error) {
@@ -113,14 +133,18 @@ func (q *Queue) Drop() {
 	os.RemoveAll(q.Path)
 }
 
-func (q *Queue) addToRunning(key string, value []byte) error {
+func (q *Queue) addToRunning(key string, value []byte, cnt int) error {
 	if len(value) == 0 {
 		return fmt.Errorf("empty value")
 	}
 	if q.runningStore == nil {
 		return fmt.Errorf("runningStore is nil")
 	}
-	return q.runningStore.Put(key, value)
+	v, err := store.ObjectToBytes(valueCnt{value, cnt})
+	if err != nil {
+		return err
+	}
+	return q.runningStore.Put(key, v)
 }
 
 func (q *Queue) retry() {
@@ -132,7 +156,11 @@ func (q *Queue) retry() {
 			now := time.Now().Format("20060102030405")
 			q.runningStore.ForEach(&util.Range{Limit: []byte(now)},
 				func(key, value []byte) (bool, error) {
-					if _, err := q.retryQueue.Enqueue(value); err != nil {
+					var v valueCnt
+					if err := store.BytesToObject(value, &v); err != nil {
+						return false, err
+					}
+					if _, err := q.retryQueue.EnqueueObject(v); err != nil {
 						return false, err
 					}
 					q.runningStore.Delete(string(key))
