@@ -69,11 +69,32 @@ func (q *Queue) Status() map[string]interface{} {
 
 func (q *Queue) Enqueue(data string) error {
 	if q.queue != nil {
-		v := &valueCnt{Value: []byte(data)}
-		_, err := q.queue.EnqueueObject(v)
+		_, err := q.queue.EnqueueObject(&valueCnt{Value: []byte(data)})
 		return err
 	}
 	return fmt.Errorf("queue is nil")
+}
+
+func (q *Queue) peek(queue *ds.Queue) (string, error) {
+	item, err := queue.Peek()
+	if err != nil {
+		return "", err
+	}
+	var v valueCnt
+	if err = store.BytesToObject(item.Value, &v); err != nil {
+		return "", err
+	}
+	return string(v.Value), nil
+}
+
+func (q *Queue) Peek() (string, error) {
+	if q.retryQueue != nil && q.retryQueue.Length() > 0 {
+		return q.peek(q.retryQueue)
+	}
+	if q.queue != nil && q.queue.Length() > 0 {
+		return q.peek(q.queue)
+	}
+	return "", fmt.Errorf("Queue is empty")
 }
 
 func (q *Queue) dequeue(queue *ds.Queue, timeout int64) (string, string, error) {
