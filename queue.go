@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/liuzl/ds"
-	"github.com/liuzl/goutil"
 	"github.com/liuzl/store"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"zliu.org/goutil"
 )
 
 type Queue struct {

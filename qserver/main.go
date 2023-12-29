@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/liuzl/goutil/rest"
 	"github.com/liuzl/q"
+	"zliu.org/goutil/rest"
 )
 
 var (
@@ -24,14 +24,14 @@ func EnqueueHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	data := strings.TrimSpace(r.FormValue("data"))
 	if data == "" {
-		rest.MustEncode(w, rest.RestMessage{"error", "data is empty"})
+		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: "data is empty"})
 		return
 	}
 	if err := queue.Enqueue(data); err != nil {
-		rest.MustEncode(w, rest.RestMessage{"error", err.Error()})
+		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
 		return
 	}
-	rest.MustEncode(w, rest.RestMessage{"ok", nil})
+	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
 }
 
 func DequeueHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,10 +45,10 @@ func DequeueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	key, value, err := queue.Dequeue(timeout)
 	if err != nil {
-		rest.MustEncode(w, rest.RestMessage{"error", err.Error()})
+		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
 		return
 	}
-	rest.MustEncode(w, rest.RestMessage{"ok", map[string]string{
+	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
 		"key": key, "value": base64.StdEncoding.EncodeToString([]byte(value)),
 	}})
 }
@@ -59,14 +59,14 @@ func ConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	key := strings.TrimSpace(r.FormValue("key"))
 	if key == "" {
-		rest.MustEncode(w, rest.RestMessage{"error", "empty key"})
+		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: "empty key"})
 		return
 	}
 	if err := queue.Confirm(key); err != nil {
-		rest.MustEncode(w, rest.RestMessage{"error", err.Error()})
+		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
 		return
 	}
-	rest.MustEncode(w, rest.RestMessage{"ok", nil})
+	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
 }
 
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
