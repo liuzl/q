@@ -1,6 +1,6 @@
 module github.com/liuzl/q
 
-go 1.21.5
+go 1.18
 
 require (
 	github.com/golang/glog v1.2.0
