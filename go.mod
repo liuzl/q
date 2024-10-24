@@ -7,10 +7,11 @@ require (
 	github.com/liuzl/ds v0.0.0-20190109073647-d2aafa2ae9eb
 	github.com/liuzl/store v0.0.0-20190530065605-e2dbcd3c77fc
 	github.com/syndtr/goleveldb v1.0.0
-	zliu.org/goutil v0.0.0-20231229005722-55cf33b52e04
+	zliu.org/goutil v0.0.0-20241019130207-6c223a2df734
 )
 
 require (
+	github.com/carlmjohnson/requests v0.23.5 // indirect
 	github.com/eknkc/basex v1.0.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/justinas/alice v1.2.0 // indirect
@@ -19,5 +20,6 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/rs/xid v1.4.0 // indirect
 	github.com/rs/zerolog v1.28.0 // indirect
-	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
+	golang.org/x/net v0.15.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 )
