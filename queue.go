@@ -54,13 +54,8 @@ func NewQueue(path string) (*Queue, error) {
 		return nil, err
 	}
 
-	// 初始化 runningCount
-	q.runningCount = 0
-	err = q.runningStore.ForEach(nil, func(_, _ []byte) (bool, error) {
-		q.runningCount++
-		return true, nil
-	})
-	if err != nil {
+	// 初始化并计算 runningCount
+	if err := q.RecountRunning(); err != nil {
 		return nil, err
 	}
 
@@ -146,9 +141,15 @@ func (q *Queue) Confirm(key string) error {
 	if q.runningStore == nil {
 		return fmt.Errorf("runningStore is nil")
 	}
-	err := q.runningStore.Delete(key)
-	if err == nil {
-		atomic.AddInt64(&q.runningCount, -1) // 减少运行中的任务数量
+	exists, err := q.runningStore.Has(key)
+	if err != nil {
+		return err
+	}
+	if exists {
+		err = q.runningStore.Delete(key)
+		if err == nil {
+			atomic.AddInt64(&q.runningCount, -1) // 只有在成功删除时才减少计数
+		}
 	}
 	return err
 }
@@ -203,8 +204,9 @@ func (q *Queue) retry() {
 					if _, err := q.retryQueue.EnqueueObject(v); err != nil {
 						return false, err
 					}
-					q.runningStore.Delete(string(key))
-					atomic.AddInt64(&q.runningCount, -1) // 减少运行中的任务数量
+					if err := q.runningStore.Delete(string(key)); err == nil {
+						atomic.AddInt64(&q.runningCount, -1) // 只有在成功删除时才减少计数
+					}
 					return true, nil
 				})
 			goutil.Sleep(5*time.Second, q.exit)
@@ -245,4 +247,17 @@ func (q *Queue) dequeueWithPreviousRetryCount(queue *ds.Queue, timeout int64) (s
 		atomic.AddInt64(&q.runningCount, 1)
 	}
 	return key, string(v.Value), previousRetryCount, nil
+}
+
+func (q *Queue) RecountRunning() error {
+	count := int64(0)
+	err := q.runningStore.ForEach(nil, func(_, _ []byte) (bool, error) {
+		count++
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+	atomic.StoreInt64(&q.runningCount, count)
+	return nil
 }
