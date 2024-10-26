@@ -211,3 +211,38 @@ func (q *Queue) retry() {
 		}
 	}
 }
+
+// DequeueWithPreviousRetryCount removes and returns the next item in the queue
+// along with the number of times it has been previously retried.
+// If a timeout is specified, the item is added to the running queue.
+func (q *Queue) DequeueWithPreviousRetryCount(timeout int64) (string, string, int, error) {
+	if q.retryQueue != nil && q.retryQueue.Length() > 0 {
+		return q.dequeueWithPreviousRetryCount(q.retryQueue, timeout)
+	}
+	if q.queue != nil && q.queue.Length() > 0 {
+		return q.dequeueWithPreviousRetryCount(q.queue, timeout)
+	}
+	return "", "", 0, fmt.Errorf("Queue is empty")
+}
+
+func (q *Queue) dequeueWithPreviousRetryCount(queue *ds.Queue, timeout int64) (string, string, int, error) {
+	item, err := queue.Dequeue()
+	if err != nil {
+		return "", "", 0, err
+	}
+	key := ""
+	var v valueCnt
+	if err = store.BytesToObject(item.Value, &v); err != nil {
+		return "", "", 0, err
+	}
+	previousRetryCount := v.Cnt
+	if timeout > 0 && (q.retryLimit <= 0 || previousRetryCount < q.retryLimit) {
+		now := time.Now().Unix()
+		key = goutil.TimeStr(now+timeout) + ":" + goutil.ContentMD5(item.Value)
+		if err = q.addToRunning(key, v.Value, previousRetryCount+1); err != nil {
+			return "", "", 0, err
+		}
+		atomic.AddInt64(&q.runningCount, 1)
+	}
+	return key, string(v.Value), previousRetryCount, nil
+}
