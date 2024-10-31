@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 	"time"
 
 	"github.com/liuzl/ds"
@@ -21,7 +20,6 @@ type Queue struct {
 	runningStore *store.LevelStore
 	exit         chan bool
 	retryLimit   int
-	runningCount int64 // 新增字段，用于存储运行中的任务数量
 }
 
 type valueCnt struct {
@@ -54,11 +52,6 @@ func NewQueue(path string) (*Queue, error) {
 		return nil, err
 	}
 
-	// 初始化并计算 runningCount
-	if err := q.RecountRunning(); err != nil {
-		return nil, err
-	}
-
 	go q.retry()
 
 	return q, nil
@@ -68,11 +61,20 @@ func (q *Queue) Status() map[string]interface{} {
 	if q.queue == nil {
 		return map[string]interface{}{"error": "queue is nil"}
 	}
+
+	var runningCount int64
+	if q.runningStore != nil {
+		q.runningStore.ForEach(nil, func(_, _ []byte) (bool, error) {
+			runningCount++
+			return true, nil
+		})
+	}
+
 	return map[string]interface{}{
 		"queue_length":       q.queue.Length(),
 		"retry_queue_length": q.retryQueue.Length(),
 		"total_queue_length": q.queue.Length() + q.retryQueue.Length(),
-		"running_count":      atomic.LoadInt64(&q.runningCount), // 使用原子操作读取计数器
+		"running_count":      runningCount,
 	}
 }
 
@@ -122,7 +124,6 @@ func (q *Queue) dequeue(queue *ds.Queue, timeout int64) (string, string, error) 
 		if err = q.addToRunning(key, v.Value, v.Cnt+1); err != nil {
 			return "", "", err
 		}
-		atomic.AddInt64(&q.runningCount, 1) // 增加运行中的任务数量
 	}
 	return key, string(v.Value), nil
 }
@@ -147,9 +148,6 @@ func (q *Queue) Confirm(key string) error {
 	}
 	if exists {
 		err = q.runningStore.Delete(key)
-		if err == nil {
-			atomic.AddInt64(&q.runningCount, -1) // 只有在成功删除时才减少计数
-		}
 	}
 	return err
 }
@@ -204,9 +202,7 @@ func (q *Queue) retry() {
 					if _, err := q.retryQueue.EnqueueObject(v); err != nil {
 						return false, err
 					}
-					if err := q.runningStore.Delete(string(key)); err == nil {
-						atomic.AddInt64(&q.runningCount, -1) // 只有在成功删除时才减少计数
-					}
+					q.runningStore.Delete(string(key))
 					return true, nil
 				})
 			goutil.Sleep(5*time.Second, q.exit)
@@ -244,20 +240,6 @@ func (q *Queue) dequeueWithPreviousRetryCount(queue *ds.Queue, timeout int64) (s
 		if err = q.addToRunning(key, v.Value, previousRetryCount+1); err != nil {
 			return "", "", 0, err
 		}
-		atomic.AddInt64(&q.runningCount, 1)
 	}
 	return key, string(v.Value), previousRetryCount, nil
-}
-
-func (q *Queue) RecountRunning() error {
-	count := int64(0)
-	err := q.runningStore.ForEach(nil, func(_, _ []byte) (bool, error) {
-		count++
-		return true, nil
-	})
-	if err != nil {
-		return err
-	}
-	atomic.StoreInt64(&q.runningCount, count)
-	return nil
 }
