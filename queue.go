@@ -192,7 +192,7 @@ func (q *Queue) retry() {
 		case <-q.exit:
 			return
 		default:
-			now := time.Now().Format("20060102030405")
+			now := goutil.TimeStr(time.Now().Unix())
 			q.runningStore.ForEach(&util.Range{Limit: []byte(now)},
 				func(key, value []byte) (bool, error) {
 					var v valueCnt
