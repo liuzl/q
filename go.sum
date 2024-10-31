@@ -63,3 +63,5 @@ gopkg.in/yaml.v2 v2.2.1/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 zliu.org/goutil v0.0.0-20241019130207-6c223a2df734 h1:giuCzrxjd/VENibfUqN/nc86tn/uh2x8/Ot6hJJHS/U=
 zliu.org/goutil v0.0.0-20241019130207-6c223a2df734/go.mod h1:inD0L5TSPMM0YJgPC3cUPZPnoLk9cHUpL2DlZQeQ4wM=
+zliu.org/goutil v0.0.0-20241031150925-efd2494eb218 h1:9L72bA/zDUAQ5nIDpPI9Cz/9Hnv/NfLMXDyg9i+0Yf8=
+zliu.org/goutil v0.0.0-20241031150925-efd2494eb218/go.mod h1:inD0L5TSPMM0YJgPC3cUPZPnoLk9cHUpL2DlZQeQ4wM=
