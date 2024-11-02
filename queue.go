@@ -78,8 +78,12 @@ func (q *Queue) Enqueue(data string) error {
 	return fmt.Errorf("queue is nil")
 }
 
-func (q *Queue) peek(queue *ds.Queue) (string, error) {
-	item, err := queue.Peek()
+func (q *Queue) Peek() (string, error) {
+	if q.queue == nil || q.queue.Length() == 0 {
+		return "", fmt.Errorf("Queue is empty")
+	}
+
+	item, err := q.queue.Peek()
 	if err != nil {
 		return "", err
 	}
@@ -90,15 +94,12 @@ func (q *Queue) peek(queue *ds.Queue) (string, error) {
 	return string(v.Value), nil
 }
 
-func (q *Queue) Peek() (string, error) {
-	if q.queue != nil && q.queue.Length() > 0 {
-		return q.peek(q.queue)
+func (q *Queue) Dequeue(timeout int64) (string, string, error) {
+	if q.queue == nil || q.queue.Length() == 0 {
+		return "", "", fmt.Errorf("Queue is empty")
 	}
-	return "", fmt.Errorf("Queue is empty")
-}
 
-func (q *Queue) dequeue(queue *ds.Queue, timeout int64) (string, string, error) {
-	item, err := queue.Dequeue()
+	item, err := q.queue.Dequeue()
 	if err != nil {
 		return "", "", err
 	}
@@ -115,13 +116,6 @@ func (q *Queue) dequeue(queue *ds.Queue, timeout int64) (string, string, error) 
 		}
 	}
 	return key, string(v.Value), nil
-}
-
-func (q *Queue) Dequeue(timeout int64) (string, string, error) {
-	if q.queue != nil && q.queue.Length() > 0 {
-		return q.dequeue(q.queue, timeout)
-	}
-	return "", "", fmt.Errorf("Queue is empty")
 }
 
 func (q *Queue) Confirm(key string) error {
@@ -197,22 +191,21 @@ func (q *Queue) retry() {
 // along with the number of times it has been previously retried.
 // If a timeout is specified, the item is added to the running queue.
 func (q *Queue) DequeueWithPreviousRetryCount(timeout int64) (string, string, int, error) {
-	if q.queue != nil && q.queue.Length() > 0 {
-		return q.dequeueWithPreviousRetryCount(q.queue, timeout)
+	if q.queue == nil || q.queue.Length() == 0 {
+		return "", "", 0, fmt.Errorf("Queue is empty")
 	}
-	return "", "", 0, fmt.Errorf("Queue is empty")
-}
 
-func (q *Queue) dequeueWithPreviousRetryCount(queue *ds.Queue, timeout int64) (string, string, int, error) {
-	item, err := queue.Dequeue()
+	item, err := q.queue.Dequeue()
 	if err != nil {
 		return "", "", 0, err
 	}
+
 	key := ""
 	var v valueCnt
 	if err = store.BytesToObject(item.Value, &v); err != nil {
 		return "", "", 0, err
 	}
+
 	previousRetryCount := v.Cnt
 	if timeout > 0 && (q.retryLimit <= 0 || previousRetryCount < q.retryLimit) {
 		now := time.Now().Unix()
@@ -221,5 +214,6 @@ func (q *Queue) dequeueWithPreviousRetryCount(queue *ds.Queue, timeout int64) (s
 			return "", "", 0, err
 		}
 	}
+
 	return key, string(v.Value), previousRetryCount, nil
 }
