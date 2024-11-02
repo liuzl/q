@@ -75,6 +75,20 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	rest.MustEncode(w, queue.Status())
 }
 
+func PeekHandler(w http.ResponseWriter, r *http.Request) {
+	glog.Infof("addr=%s  method=%s host=%s uri=%s",
+		r.RemoteAddr, r.Method, r.Host, r.RequestURI)
+	r.ParseForm()
+	value, err := queue.Peek()
+	if err != nil {
+		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		return
+	}
+	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
+		"value": base64.StdEncoding.EncodeToString([]byte(value)),
+	}})
+}
+
 func main() {
 	flag.Parse()
 	defer glog.Flush()
@@ -82,8 +96,10 @@ func main() {
 	if queue, err = q.NewQueue(*path); err != nil {
 		glog.Fatal(err)
 	}
+	defer queue.Close()
 	defer glog.Info("server exit")
 	http.Handle("/dequeue/", rest.WithLog(DequeueHandler))
+	http.Handle("/peek/", rest.WithLog(PeekHandler))
 	http.Handle("/enqueue/", rest.WithLog(EnqueueHandler))
 	http.Handle("/confirm/", rest.WithLog(ConfirmHandler))
 	http.Handle("/status/", rest.WithLog(StatusHandler))
