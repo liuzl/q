@@ -15,15 +15,16 @@ import (
 type Queue struct {
 	Path string `json:"path"`
 
-	queue        *ds.Queue
+	queue        *ds.PriorityQueue
 	runningStore *store.LevelStore
 	exit         chan bool
 	retryLimit   int
 }
 
 type valueCnt struct {
-	Value []byte
-	Cnt   int
+	Value    []byte
+	Priority uint8
+	Cnt      int
 }
 
 func NewQueueWithRetryLimit(path string, limit int) (*Queue, error) {
@@ -39,7 +40,7 @@ func NewQueue(path string) (*Queue, error) {
 	q := &Queue{Path: path, exit: make(chan bool)}
 	var err error
 	queueDir := filepath.Join(path, "queue")
-	if q.queue, err = ds.OpenQueue(queueDir); err != nil {
+	if q.queue, err = ds.OpenPriorityQueue(queueDir); err != nil {
 		return nil, err
 	}
 	storeDir := filepath.Join(path, "running")
@@ -70,12 +71,16 @@ func (q *Queue) Status() map[string]interface{} {
 	}
 }
 
-func (q *Queue) Enqueue(data string) error {
+func (q *Queue) EnqueueWithPriority(data string, priority uint8) error {
 	if q.queue != nil {
-		_, err := q.queue.EnqueueObject(&valueCnt{Value: []byte(data)})
+		_, err := q.queue.EnqueueObject(&valueCnt{Value: []byte(data), Priority: priority}, priority)
 		return err
 	}
 	return fmt.Errorf("queue is nil")
+}
+
+func (q *Queue) Enqueue(data string) error {
+	return q.EnqueueWithPriority(data, 128)
 }
 
 func (q *Queue) Peek() (string, error) {
@@ -111,7 +116,7 @@ func (q *Queue) Dequeue(timeout int64) (string, string, error) {
 	if timeout > 0 && (q.retryLimit <= 0 || v.Cnt < q.retryLimit) {
 		now := time.Now().Unix()
 		key = goutil.TimeStr(now+timeout) + ":" + goutil.ContentMD5(item.Value)
-		if err = q.addToRunning(key, v.Value, v.Cnt+1); err != nil {
+		if err = q.addToRunning(key, v.Value, v.Priority, v.Cnt+1); err != nil {
 			return "", "", err
 		}
 	}
@@ -149,14 +154,14 @@ func (q *Queue) Drop() {
 	os.RemoveAll(q.Path)
 }
 
-func (q *Queue) addToRunning(key string, value []byte, cnt int) error {
+func (q *Queue) addToRunning(key string, value []byte, priority uint8, cnt int) error {
 	if len(value) == 0 {
 		return fmt.Errorf("empty value")
 	}
 	if q.runningStore == nil {
 		return fmt.Errorf("runningStore is nil")
 	}
-	v, err := store.ObjectToBytes(valueCnt{value, cnt})
+	v, err := store.ObjectToBytes(valueCnt{value, priority, cnt})
 	if err != nil {
 		return err
 	}
@@ -176,7 +181,7 @@ func (q *Queue) retry() {
 					if err := store.BytesToObject(value, &v); err != nil {
 						return false, err
 					}
-					if _, err := q.queue.EnqueueObject(v); err != nil {
+					if _, err := q.queue.EnqueueObject(v, v.Priority); err != nil {
 						return false, err
 					}
 					q.runningStore.Delete(string(key))
@@ -210,7 +215,7 @@ func (q *Queue) DequeueWithPreviousRetryCount(timeout int64) (string, string, in
 	if timeout > 0 && (q.retryLimit <= 0 || previousRetryCount < q.retryLimit) {
 		now := time.Now().Unix()
 		key = goutil.TimeStr(now+timeout) + ":" + goutil.ContentMD5(item.Value)
-		if err = q.addToRunning(key, v.Value, previousRetryCount+1); err != nil {
+		if err = q.addToRunning(key, v.Value, v.Priority, previousRetryCount+1); err != nil {
 			return "", "", 0, err
 		}
 	}

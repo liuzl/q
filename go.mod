@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/golang/glog v1.2.0
-	github.com/liuzl/ds v0.0.0-20190109073647-d2aafa2ae9eb
+	github.com/liuzl/ds v0.0.0-20241102124846-854c79ec12e2
 	github.com/liuzl/store v0.0.0-20190530065605-e2dbcd3c77fc
 	github.com/syndtr/goleveldb v1.0.0
 	zliu.org/goutil v0.0.0-20241031150925-efd2494eb218
