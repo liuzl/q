@@ -12,3 +12,5 @@
 *.out
 
 qserver/qserver
+qserver/queue
+zerolog
