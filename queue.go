@@ -16,7 +16,6 @@ type Queue struct {
 	Path string `json:"path"`
 
 	queue        *ds.Queue
-	retryQueue   *ds.Queue
 	runningStore *store.LevelStore
 	exit         chan bool
 	retryLimit   int
@@ -43,17 +42,12 @@ func NewQueue(path string) (*Queue, error) {
 	if q.queue, err = ds.OpenQueue(queueDir); err != nil {
 		return nil, err
 	}
-	retryDir := filepath.Join(path, "retry_queue")
-	if q.retryQueue, err = ds.OpenQueue(retryDir); err != nil {
-		return nil, err
-	}
 	storeDir := filepath.Join(path, "running")
 	if q.runningStore, err = store.NewLevelStore(storeDir); err != nil {
 		return nil, err
 	}
 
 	go q.retry()
-
 	return q, nil
 }
 
@@ -71,10 +65,8 @@ func (q *Queue) Status() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"queue_length":       q.queue.Length(),
-		"retry_queue_length": q.retryQueue.Length(),
-		"total_queue_length": q.queue.Length() + q.retryQueue.Length(),
-		"running_count":      runningCount,
+		"queue_length":  q.queue.Length(),
+		"running_count": runningCount,
 	}
 }
 
@@ -99,9 +91,6 @@ func (q *Queue) peek(queue *ds.Queue) (string, error) {
 }
 
 func (q *Queue) Peek() (string, error) {
-	if q.retryQueue != nil && q.retryQueue.Length() > 0 {
-		return q.peek(q.retryQueue)
-	}
 	if q.queue != nil && q.queue.Length() > 0 {
 		return q.peek(q.queue)
 	}
@@ -129,9 +118,6 @@ func (q *Queue) dequeue(queue *ds.Queue, timeout int64) (string, string, error) 
 }
 
 func (q *Queue) Dequeue(timeout int64) (string, string, error) {
-	if q.retryQueue != nil && q.retryQueue.Length() > 0 {
-		return q.dequeue(q.retryQueue, timeout)
-	}
 	if q.queue != nil && q.queue.Length() > 0 {
 		return q.dequeue(q.queue, timeout)
 	}
@@ -158,9 +144,6 @@ func (q *Queue) Close() {
 	}
 	if q.queue != nil {
 		q.queue.Close()
-	}
-	if q.retryQueue != nil {
-		q.retryQueue.Close()
 	}
 	if q.runningStore != nil {
 		q.runningStore.Close()
@@ -199,7 +182,7 @@ func (q *Queue) retry() {
 					if err := store.BytesToObject(value, &v); err != nil {
 						return false, err
 					}
-					if _, err := q.retryQueue.EnqueueObject(v); err != nil {
+					if _, err := q.queue.EnqueueObject(v); err != nil {
 						return false, err
 					}
 					q.runningStore.Delete(string(key))
@@ -214,9 +197,6 @@ func (q *Queue) retry() {
 // along with the number of times it has been previously retried.
 // If a timeout is specified, the item is added to the running queue.
 func (q *Queue) DequeueWithPreviousRetryCount(timeout int64) (string, string, int, error) {
-	if q.retryQueue != nil && q.retryQueue.Length() > 0 {
-		return q.dequeueWithPreviousRetryCount(q.retryQueue, timeout)
-	}
 	if q.queue != nil && q.queue.Length() > 0 {
 		return q.dequeueWithPreviousRetryCount(q.queue, timeout)
 	}
