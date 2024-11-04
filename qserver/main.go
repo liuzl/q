@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"flag"
 	"net/http"
 	"strconv"
@@ -24,11 +23,11 @@ func EnqueueHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	data := strings.TrimSpace(r.FormValue("data"))
 	if data == "" {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: "data is empty"})
+		rest.ErrBadRequest(w, "data is empty")
 		return
 	}
 	if err := queue.Enqueue(data); err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err)
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
@@ -45,11 +44,11 @@ func DequeueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	key, value, err := queue.Dequeue(timeout)
 	if err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err)
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
-		"key": key, "value": base64.StdEncoding.EncodeToString([]byte(value)),
+		"key": key, "value": value,
 	}})
 }
 
@@ -59,11 +58,11 @@ func ConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	key := strings.TrimSpace(r.FormValue("key"))
 	if key == "" {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: "empty key"})
+		rest.ErrBadRequest(w, "empty key")
 		return
 	}
 	if err := queue.Confirm(key); err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err)
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
@@ -81,11 +80,11 @@ func PeekHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	value, err := queue.Peek()
 	if err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err)
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
-		"value": base64.StdEncoding.EncodeToString([]byte(value)),
+		"value": value,
 	}})
 }
 
