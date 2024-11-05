@@ -80,7 +80,7 @@ func PeekHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	value, err := queue.Peek()
 	if err != nil {
-		rest.ErrInternalServer(w, err)
+		rest.ErrInternalServer(w, err.Error())
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
