@@ -18,7 +18,8 @@ var (
 	queue *q.Queue
 )
 
-func EnqueueHandler(w http.ResponseWriter, r *http.Request) {
+// 创建任务
+func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	glog.Infof("addr=%s  method=%s host=%s uri=%s",
 		r.RemoteAddr, r.Method, r.Host, r.RequestURI)
 	r.ParseForm()
@@ -34,7 +35,8 @@ func EnqueueHandler(w http.ResponseWriter, r *http.Request) {
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
 }
 
-func DequeueHandler(w http.ResponseWriter, r *http.Request) {
+// 获取任务
+func GetTaskHandler(w http.ResponseWriter, r *http.Request) {
 	glog.Infof("addr=%s  method=%s host=%s uri=%s",
 		r.RemoteAddr, r.Method, r.Host, r.RequestURI)
 	r.ParseForm()
@@ -46,7 +48,11 @@ func DequeueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	key, value, err := queue.Dequeue(timeout)
 	if err != nil {
-		rest.ErrInternalServer(w, err)
+		if err.Error() == "Queue is empty" {
+			rest.ErrorMessageWithStatus(w, err.Error(), http.StatusNotFound)
+		} else {
+			rest.ErrInternalServer(w, err)
+		}
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
@@ -54,35 +60,46 @@ func DequeueHandler(w http.ResponseWriter, r *http.Request) {
 	}})
 }
 
-func ConfirmHandler(w http.ResponseWriter, r *http.Request) {
+// 更新任务状态
+func UpdateTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
 	glog.Infof("addr=%s  method=%s host=%s uri=%s",
 		r.RemoteAddr, r.Method, r.Host, r.RequestURI)
-	r.ParseForm()
-	key := strings.TrimSpace(r.FormValue("key"))
+
+	key := r.PathValue("key")
 	if key == "" {
 		rest.ErrBadRequest(w, "empty key")
 		return
 	}
 	if err := queue.Confirm(key); err != nil {
-		rest.ErrInternalServer(w, err)
+		if strings.HasPrefix(err.Error(), "key not found") {
+			rest.ErrorMessageWithStatus(w, err.Error(), http.StatusNotFound)
+		} else {
+			rest.ErrInternalServer(w, err)
+		}
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
 }
 
-func StatusHandler(w http.ResponseWriter, r *http.Request) {
+// 获取队列状态
+func GetQueueStatusHandler(w http.ResponseWriter, r *http.Request) {
 	glog.Infof("addr=%s  method=%s host=%s uri=%s",
 		r.RemoteAddr, r.Method, r.Host, r.RequestURI)
 	rest.MustEncode(w, queue.Status())
 }
 
-func PeekHandler(w http.ResponseWriter, r *http.Request) {
+// 获取下一个任务预览
+func GetNextTaskHandler(w http.ResponseWriter, r *http.Request) {
 	glog.Infof("addr=%s  method=%s host=%s uri=%s",
 		r.RemoteAddr, r.Method, r.Host, r.RequestURI)
 	r.ParseForm()
 	value, err := queue.Peek()
 	if err != nil {
-		rest.ErrInternalServer(w, err.Error())
+		if err.Error() == "Queue is empty" {
+			rest.ErrorMessageWithStatus(w, err.Error(), http.StatusNotFound)
+		} else {
+			rest.ErrInternalServer(w, err)
+		}
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
@@ -102,11 +119,18 @@ func main() {
 
 	s := fuego.NewServer(fuego.WithAddr(*addr))
 
-	fuego.GetStd(s, "/enqueue/", EnqueueHandler).Param("query", "data", "Data to enqueue", fuego.OpenAPIParam{Required: true, Type: "string"})
-	fuego.GetStd(s, "/dequeue/", DequeueHandler).Param("query", "timeout", "Timeout in seconds", fuego.OpenAPIParam{Type: "int", Example: "300"})
-	fuego.GetStd(s, "/confirm/", ConfirmHandler).Param("query", "key", "Key to confirm", fuego.OpenAPIParam{Required: true, Type: "string"})
-	fuego.GetStd(s, "/status/", StatusHandler)
-	fuego.GetStd(s, "/peek/", PeekHandler)
+	fuego.PostStd(s, "/tasks", CreateTaskHandler).
+		Param("query", "data", "Data to enqueue", fuego.OpenAPIParam{Required: true, Type: "string"})
+
+	fuego.GetStd(s, "/tasks", GetTaskHandler).
+		Param("query", "timeout", "Timeout in seconds", fuego.OpenAPIParam{Type: "int", Example: "300"})
+
+	fuego.PutStd(s, "/tasks/{key}", UpdateTaskStatusHandler).
+		Param("path", "key", "Task key to confirm", fuego.OpenAPIParam{Required: true, Type: "string"})
+
+	fuego.GetStd(s, "/status", GetQueueStatusHandler)
+
+	fuego.GetStd(s, "/tasks/next", GetNextTaskHandler)
 
 	glog.Info("qserver listen on", *addr)
 	s.Run()

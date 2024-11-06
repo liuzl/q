@@ -133,9 +133,9 @@ func (q *Queue) Confirm(key string) error {
 		return err
 	}
 	if exists {
-		err = q.runningStore.Delete(key)
+		return q.runningStore.Delete(key)
 	}
-	return err
+	return fmt.Errorf("key not found: %s", key)
 }
 
 func (q *Queue) Close() {
