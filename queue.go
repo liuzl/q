@@ -116,7 +116,8 @@ func (q *Queue) Dequeue(timeout int64) (string, string, error) {
 	if timeout > 0 && (q.retryLimit <= 0 || v.Cnt < q.retryLimit) {
 		now := time.Now().Unix()
 		key = goutil.TimeStr(now+timeout) + ":" + goutil.ContentMD5(item.Value)
-		if err = q.addToRunning(key, v.Value, v.Priority, v.Cnt+1); err != nil {
+		v.Cnt++
+		if err = q.addToRunning(key, &v); err != nil {
 			return "", "", err
 		}
 	}
@@ -154,14 +155,14 @@ func (q *Queue) Drop() {
 	os.RemoveAll(q.Path)
 }
 
-func (q *Queue) addToRunning(key string, value []byte, priority uint8, cnt int) error {
-	if len(value) == 0 {
+func (q *Queue) addToRunning(key string, item *valueCnt) error {
+	if len(item.Value) == 0 {
 		return fmt.Errorf("empty value")
 	}
 	if q.runningStore == nil {
 		return fmt.Errorf("runningStore is nil")
 	}
-	v, err := store.ObjectToBytes(valueCnt{value, priority, cnt})
+	v, err := store.ObjectToBytes(item)
 	if err != nil {
 		return err
 	}
@@ -215,7 +216,8 @@ func (q *Queue) DequeueWithPreviousRetryCount(timeout int64) (string, string, in
 	if timeout > 0 && (q.retryLimit <= 0 || previousRetryCount < q.retryLimit) {
 		now := time.Now().Unix()
 		key = goutil.TimeStr(now+timeout) + ":" + goutil.ContentMD5(item.Value)
-		if err = q.addToRunning(key, v.Value, v.Priority, previousRetryCount+1); err != nil {
+		v.Cnt++
+		if err = q.addToRunning(key, &v); err != nil {
 			return "", "", 0, err
 		}
 	}
