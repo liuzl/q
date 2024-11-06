@@ -13,4 +13,5 @@
 
 qserver/qserver
 qserver/queue
+qserver/doc
 zerolog
