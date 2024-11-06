@@ -1,19 +1,19 @@
 package main
 
 import (
-	"encoding/base64"
 	"flag"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/go-fuego/fuego"
 	"github.com/golang/glog"
 	"github.com/liuzl/q"
 	"zliu.org/goutil/rest"
 )
 
 var (
-	addr  = flag.String("addr", ":9080", "bind address")
+	addr  = flag.String("addr", "127.0.0.1:9080", "bind address")
 	path  = flag.String("path", "./queue", "task queue dir")
 	queue *q.Queue
 )
@@ -24,11 +24,11 @@ func EnqueueHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	data := strings.TrimSpace(r.FormValue("data"))
 	if data == "" {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: "data is empty"})
+		rest.ErrBadRequest(w, "data is empty")
 		return
 	}
 	if err := queue.Enqueue(data); err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err)
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
@@ -41,15 +41,16 @@ func DequeueHandler(w http.ResponseWriter, r *http.Request) {
 	t := strings.TrimSpace(r.FormValue("timeout"))
 	timeout, err := strconv.ParseInt(t, 10, 64)
 	if err != nil {
-		timeout = 300
+		rest.ErrBadRequest(w, "invalid timeout")
+		return
 	}
 	key, value, err := queue.Dequeue(timeout)
 	if err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err)
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
-		"key": key, "value": base64.StdEncoding.EncodeToString([]byte(value)),
+		"key": key, "value": value,
 	}})
 }
 
@@ -59,11 +60,11 @@ func ConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	key := strings.TrimSpace(r.FormValue("key"))
 	if key == "" {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: "empty key"})
+		rest.ErrBadRequest(w, "empty key")
 		return
 	}
 	if err := queue.Confirm(key); err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err)
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
@@ -81,11 +82,11 @@ func PeekHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	value, err := queue.Peek()
 	if err != nil {
-		rest.MustEncode(w, rest.RestMessage{Status: "error", Message: err.Error()})
+		rest.ErrInternalServer(w, err.Error())
 		return
 	}
 	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
-		"value": base64.StdEncoding.EncodeToString([]byte(value)),
+		"value": value,
 	}})
 }
 
@@ -98,11 +99,15 @@ func main() {
 	}
 	defer queue.Close()
 	defer glog.Info("server exit")
-	http.Handle("/dequeue/", rest.WithLog(DequeueHandler))
-	http.Handle("/peek/", rest.WithLog(PeekHandler))
-	http.Handle("/enqueue/", rest.WithLog(EnqueueHandler))
-	http.Handle("/confirm/", rest.WithLog(ConfirmHandler))
-	http.Handle("/status/", rest.WithLog(StatusHandler))
+
+	s := fuego.NewServer(fuego.WithAddr(*addr))
+
+	fuego.GetStd(s, "/enqueue/", EnqueueHandler).Param("query", "data", "Data to enqueue", fuego.OpenAPIParam{Required: true, Type: "string"})
+	fuego.GetStd(s, "/dequeue/", DequeueHandler).Param("query", "timeout", "Timeout in seconds", fuego.OpenAPIParam{Type: "int", Example: "300"})
+	fuego.GetStd(s, "/confirm/", ConfirmHandler).Param("query", "key", "Key to confirm", fuego.OpenAPIParam{Required: true, Type: "string"})
+	fuego.GetStd(s, "/status/", StatusHandler)
+	fuego.GetStd(s, "/peek/", PeekHandler)
+
 	glog.Info("qserver listen on", *addr)
-	glog.Error(http.ListenAndServe(*addr, nil))
+	s.Run()
 }
