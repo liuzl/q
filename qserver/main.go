@@ -32,7 +32,7 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		rest.ErrInternalServer(w, err)
 		return
 	}
-	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
+	rest.MustEncode(w, map[string]string{"status": "ok"})
 }
 
 // 获取任务
@@ -55,9 +55,7 @@ func GetTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
-		"key": key, "value": value,
-	}})
+	rest.MustEncode(w, map[string]string{"key": key, "value": value})
 }
 
 // 更新任务状态
@@ -78,7 +76,7 @@ func UpdateTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: nil})
+	rest.MustEncode(w, map[string]string{"status": "ok"})
 }
 
 // 获取队列状态
@@ -102,9 +100,7 @@ func GetNextTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	rest.MustEncode(w, rest.RestMessage{Status: "ok", Message: map[string]string{
-		"value": value,
-	}})
+	rest.MustEncode(w, map[string]string{"value": value})
 }
 
 func main() {
@@ -128,7 +124,7 @@ func main() {
 	fuego.PutStd(s, "/tasks/{key}", UpdateTaskStatusHandler).
 		Param("path", "key", "Task key to confirm", fuego.OpenAPIParam{Required: true, Type: "string"})
 
-	fuego.GetStd(s, "/status", GetQueueStatusHandler)
+	fuego.GetStd(s, "/tasks/status", GetQueueStatusHandler)
 
 	fuego.GetStd(s, "/tasks/next", GetNextTaskHandler)
 
