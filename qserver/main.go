@@ -51,7 +51,7 @@ func GetTaskHandler(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == "Queue is empty" {
 			rest.ErrorMessageWithStatus(w, err.Error(), http.StatusNotFound)
 		} else {
-			rest.ErrInternalServer(w, err)
+			rest.ErrInternalServer(w, err.Error())
 		}
 		return
 	}
@@ -96,7 +96,7 @@ func GetNextTaskHandler(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == "Queue is empty" {
 			rest.ErrorMessageWithStatus(w, err.Error(), http.StatusNotFound)
 		} else {
-			rest.ErrInternalServer(w, err)
+			rest.ErrInternalServer(w, err.Error())
 		}
 		return
 	}
@@ -121,8 +121,7 @@ func main() {
 	fuego.GetStd(s, "/tasks", GetTaskHandler).
 		Param("query", "timeout", "Timeout in seconds", fuego.OpenAPIParam{Type: "int", Example: "300"})
 
-	fuego.PutStd(s, "/tasks/{key}", UpdateTaskStatusHandler).
-		Param("path", "key", "Task key to confirm", fuego.OpenAPIParam{Required: true, Type: "string"})
+	fuego.PutStd(s, "/tasks/{key}", UpdateTaskStatusHandler)
 
 	fuego.GetStd(s, "/tasks/status", GetQueueStatusHandler)
 

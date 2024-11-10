@@ -26,7 +26,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/justinas/alice v1.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/liuzl/ds v0.0.0-20241106003532-9615ecc55a9f // indirect
+	github.com/liuzl/ds v0.0.0-20241110115610-698361118af0 // indirect
 	github.com/liuzl/filestore v0.0.0-20200229104338-5ea723a6a528 // indirect
 	github.com/liuzl/store v0.0.0-20190530065605-e2dbcd3c77fc // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
