@@ -182,6 +182,7 @@ func (q *Queue) retry() {
 					if err := store.BytesToObject(value, &v); err != nil {
 						return false, err
 					}
+					v.Priority = 0 // retry with highest priority
 					if _, err := q.queue.EnqueueObject(v, v.Priority); err != nil {
 						return false, err
 					}
