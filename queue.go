@@ -52,6 +52,13 @@ func NewQueue(path string) (*Queue, error) {
 	return q, nil
 }
 
+func (q *Queue) Length() uint64 {
+	if q.queue == nil {
+		return 0
+	}
+	return q.queue.Length()
+}
+
 func (q *Queue) Status() map[string]interface{} {
 	if q.queue == nil {
 		return map[string]interface{}{"error": "queue is nil"}
