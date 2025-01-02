@@ -45,11 +45,27 @@ func main() {
 		option.QueryInt("timeout", "Timeout in seconds", param.Default(300)),
 	)
 
-	fuego.PutStd(s, "/tasks/{key}", server.UpdateTaskStatusHandler)
+	fuego.PutStd(s, "/tasks/{key}", server.UpdateTaskStatusHandler,
+		option.Summary("Confirm a task"),
+		option.Description("Confirm a task is done"),
+		option.OperationID("confirmTask"),
+		option.Tags("tasks"),
+		option.Path("key", "Task key"),
+	)
 
-	fuego.GetStd(s, "/tasks/status", server.GetQueueStatusHandler)
+	fuego.GetStd(s, "/tasks/status", server.GetQueueStatusHandler,
+		option.Summary("Get queue status"),
+		option.Description("Get queue status"),
+		option.OperationID("getQueueStatus"),
+		option.Tags("tasks"),
+	)
 
-	fuego.GetStd(s, "/tasks/next", server.GetNextTaskHandler)
+	fuego.GetStd(s, "/tasks/next", server.GetNextTaskHandler,
+		option.Summary("Get next task"),
+		option.Description("Get next task"),
+		option.OperationID("getNextTask"),
+		option.Tags("tasks"),
+	)
 
 	zlog.Info().Str("addr", *addr).Msg("qserver listen on")
 	s.Run()
